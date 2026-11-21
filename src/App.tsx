@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
+import { Lock, ShieldCheck } from 'lucide-react';
 import { AnalisisNilaiView } from './components/AnalisisNilaiView';
 import { ArchiveView } from './components/ArchiveView';
 import { CognitiveAnalyticsBar } from './components/CognitiveAnalyticsBar';
 import { CognitiveMatrixView } from './components/CognitiveMatrixView';
 import { ConfigPanel } from './components/ConfigPanel';
+import {
+  FormUjianView,
+  STORAGE_CBT_SESSIONS_KEY,
+} from './components/FormUjianView';
 import { ItemPreviewModal } from './components/ItemPreviewModal';
 import { KisiTable } from './components/KisiTable';
 import { NaskahSoalView } from './components/NaskahSoalView';
@@ -13,17 +18,27 @@ import {
 } from './components/PedomanPenilaianView';
 import { PrintPreviewView } from './components/PrintPreviewView';
 import { TopBar, type ActiveTab } from './components/TopBar';
-import { GRADE_LABELS, INITIAL_BLUEPRINT, SEMESTER_LABELS } from './data/smpCurriculum';
+import {
+  GRADE_LABELS,
+  INITIAL_BLUEPRINT,
+  SEMESTER_LABELS,
+  SMP_SUBJECTS,
+  getSuggestedTopics,
+} from './data/smpCurriculum';
 import type {
   AssessmentGuidePackage,
+  CbtSharedSession,
   ExamConfig,
   ExamPaperPackage,
   GeneratedSampleItem,
+  GradeSMP,
   KisiBlueprint,
   KisiRow,
+  Semester,
 } from './types/kisiKisi';
 import { postApiJson } from './utils/apiClient';
 import {
+  generateLocalExamPaper,
   generateLocalKisiKisi,
   generateLocalSampleItem,
 } from './utils/localEvaluationEngine';
@@ -38,7 +53,47 @@ const STORAGE_ARCHIVE_KEY = 'evaluasi_smp_archive_v1';
 const STORAGE_NASKAH_KEY = 'evaluasi_smp_naskah_v1';
 const STORAGE_GUIDE_KEY = 'evaluasi_smp_guide_v1';
 
+interface CbtQueryParams {
+  code: string;
+  mapel: string;
+  kelas: GradeSMP;
+  sem: Semester;
+}
+
+function readCbtQueryParams(): CbtQueryParams | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('cbt')?.trim() || '';
+  if (!code) return null;
+
+  const rawMapel = params.get('mapel')?.trim() || '';
+  const matchedSubject =
+    SMP_SUBJECTS.find((s) => s.toLowerCase() === rawMapel.toLowerCase()) ||
+    rawMapel ||
+    INITIAL_BLUEPRINT.config.mataPelajaran;
+
+  const rawKelas = params.get('kelas')?.trim();
+  const kelas: GradeSMP =
+    rawKelas === '7' || rawKelas === '8' || rawKelas === '9' ? rawKelas : '7';
+
+  const rawSem = params.get('sem')?.trim();
+  const sem: Semester = rawSem === '2' ? '2' : '1';
+
+  return {
+    code,
+    mapel: matchedSubject,
+    kelas,
+    sem,
+  };
+}
+
 export default function App() {
+  const [cbtQuery] = useState<CbtQueryParams | null>(() => readCbtQueryParams());
+  const [cbtSession, setCbtSession] = useState<CbtSharedSession | null>(null);
+  const [isLoadingCbt, setIsLoadingCbt] = useState<boolean>(() =>
+    Boolean(readCbtQueryParams())
+  );
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('builder');
 
   const [blueprint, setBlueprint] = useState<KisiBlueprint>(() => {
@@ -245,6 +300,160 @@ export default function App() {
   const handleDeleteSaved = (id: string) => {
     setSavedBlueprints((prev) => prev.filter((item) => item.id !== id));
   };
+
+  useEffect(() => {
+    if (!cbtQuery) return;
+    let cancelled = false;
+
+    const loadSharedCbt = async () => {
+      setIsLoadingCbt(true);
+      try {
+        const resp = await fetch(
+          `/api/cbt/sessions/${encodeURIComponent(cbtQuery.code)}?role=student`
+        );
+        if (resp.ok) {
+          const data = (await resp.json()) as { session?: CbtSharedSession };
+          if (!cancelled && data.session) {
+            setCbtSession(data.session);
+            setIsLoadingCbt(false);
+            return;
+          }
+        }
+      } catch {
+        // Continue to localStorage / subject fallback
+      }
+
+      try {
+        const raw = localStorage.getItem(STORAGE_CBT_SESSIONS_KEY);
+        if (raw) {
+          const list = JSON.parse(raw) as CbtSharedSession[];
+          const found = list.find(
+            (s) => s.code.toUpperCase() === cbtQuery.code.toUpperCase()
+          );
+          if (!cancelled && found) {
+            setCbtSession(found);
+            setIsLoadingCbt(false);
+            return;
+          }
+        }
+      } catch {
+        // Ignore storage read error
+      }
+
+      // Subject-matched deterministic fallback so any Share Link works offline/across restarts
+      const topics = getSuggestedTopics(
+        cbtQuery.mapel,
+        cbtQuery.kelas,
+        cbtQuery.sem
+      );
+      const kisiSummary = topics
+        .map(
+          (topic, i) =>
+            `| ${i + 1} | CP ${cbtQuery.mapel} | Memahami ${topic} | ${topic} | Peserta didik mampu menganalisis dan menyelesaikan masalah terkait ${topic} | C3 | Menerapkan | Pilihan Ganda | ${i + 1} | 10 |`
+        )
+        .join('\n');
+
+      const fallbackPaper = generateLocalExamPaper({
+        kisiKisiText: kisiSummary,
+        mataPelajaran: cbtQuery.mapel,
+        kelasLabel: GRADE_LABELS[cbtQuery.kelas],
+        semesterLabel: SEMESTER_LABELS[cbtQuery.sem],
+        jenisUjian: blueprint.config.jenisUjian,
+        namaSekolah: blueprint.config.namaSekolah,
+        tahunAjaran: blueprint.config.tahunAjaran,
+        alokasiWaktu: blueprint.config.alokasiWaktu || '90 Menit',
+        jumlahPG: 20,
+        jumlahIsian: 5,
+        jumlahUraian: 3,
+      });
+
+      if (!cancelled) {
+        setCbtSession({
+          code: cbtQuery.code.toUpperCase(),
+          paper: fallbackPaper,
+          kktp: 75,
+          security: {
+            acakSoal: true,
+            acakOpsi: true,
+            wajibFullscreen: true,
+            blokirCopyKlikKanan: true,
+            batasPelanggaranTab: 3,
+            tokenUjian: '',
+            tampilkanNilaiKeSiswa: true,
+          },
+          createdAt: new Date().toISOString(),
+        });
+        setIsLoadingCbt(false);
+      }
+    };
+
+    loadSharedCbt();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cbtQuery,
+    blueprint.config.alokasiWaktu,
+    blueprint.config.jenisUjian,
+    blueprint.config.namaSekolah,
+    blueprint.config.tahunAjaran,
+  ]);
+
+  if (cbtQuery) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+          <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
+                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate font-display text-sm font-bold text-slate-950">
+                  {cbtSession?.paper.mataPelajaran || cbtQuery.mapel}
+                </p>
+                <p className="truncate text-[11px] text-slate-500">
+                  {cbtSession?.paper.kelasLabel || GRADE_LABELS[cbtQuery.kelas]}
+                  <span aria-hidden="true" className="mx-1.5 text-slate-300">
+                    ·
+                  </span>
+                  <span>Mode Peserta CBT Terkunci</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-xs font-semibold text-slate-800">
+                <Lock className="h-3.5 w-3.5 text-indigo-600" aria-hidden="true" />
+                <span>{cbtQuery.code.toUpperCase()}</span>
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 sm:px-6">
+          {isLoadingCbt || !cbtSession ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
+              <p className="font-display text-base font-semibold text-slate-900">
+                Menyiapkan Ruang Ujian CBT...
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Memuat paket soal mata pelajaran {cbtQuery.mapel} ({GRADE_LABELS[cbtQuery.kelas]}).
+              </p>
+            </div>
+          ) : (
+            <FormUjianView
+              blueprint={blueprint}
+              examPaper={null}
+              onSwitchToGenerator={() => {}}
+              studentLockMode={true}
+              sharedSession={cbtSession}
+            />
+          )}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div id="top" className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col">

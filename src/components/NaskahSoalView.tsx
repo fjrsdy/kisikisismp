@@ -250,7 +250,7 @@ export const NaskahSoalView: React.FC<NaskahSoalViewProps> = ({
             }`}
           >
             <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>2. Form Ujian Digital</span>
+            <span>2. Form Ujian &amp; CBT</span>
           </button>
         </div>
       </div>

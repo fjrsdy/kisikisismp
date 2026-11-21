@@ -285,5 +285,27 @@ export interface ExamFormSubmission {
   maksUraian: number;
   nilaiAkhir: number;
   durasiDetik: number;
+  pelanggaranFokus?: number;
+  dikumpulkanOtomatis?: boolean;
+  cbtSessionCode?: string;
   submittedAt: string;
 }
+
+export interface CbtSecurityConfig {
+  acakSoal: boolean;
+  acakOpsi: boolean;
+  wajibFullscreen: boolean;
+  blokirCopyKlikKanan: boolean;
+  batasPelanggaranTab: number;
+  tokenUjian: string;
+  tampilkanNilaiKeSiswa: boolean;
+}
+
+export interface CbtSharedSession {
+  code: string;
+  paper: ExamPaperPackage;
+  kktp: number;
+  security: CbtSecurityConfig;
+  createdAt: string;
+}
+
