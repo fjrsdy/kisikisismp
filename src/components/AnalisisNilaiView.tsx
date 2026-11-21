@@ -24,12 +24,10 @@ import {
   exportScoreAnalysisToCSV,
   exportScoreAnalysisToWordDoc,
 } from '../utils/exportBlueprint';
+import { generateLocalScoreInterpretation } from '../utils/localEvaluationEngine';
 import { computeScoreStatistics, parseStudentScores } from '../utils/scoreParser';
 import { STORAGE_FORM_SUBMISSIONS_KEY } from './FormUjianView';
-import {
-  INITIAL_LEARNING_REPORT,
-  LaporanEvaluasiView,
-} from './LaporanEvaluasiView';
+import { LaporanEvaluasiView } from './LaporanEvaluasiView';
 
 interface AnalisisNilaiViewProps {
   blueprint: KisiBlueprint;
@@ -68,36 +66,10 @@ const SAMPLE_STUDENT_SCORES = `1\tAditya Pratama\t88
 29\tVino Alfarizi\t66
 30\tZahra Khairunnisa\t93`;
 
-const INITIAL_NARRATIVE: ScoreAnalysisNarrative = {
-  statusKetuntasanKlasikal:
-    'Belum Memenuhi Target Klasikal Ideal (70,0% tuntas; masih terdapat 30,0% siswa di bawah KKTP 75)',
-  ringkasanEksekutif:
-    'Dari 30 peserta didik yang mengikuti ujian semester, nilai rata-rata kelas mencapai 79,07 (di atas KKTP 75) dengan sebaran nilai antara 58 hingga 96. Sebanyak 21 siswa (70,0%) telah mencapai ketuntasan belajar, sedangkan 9 siswa (30,0%) memerlukan intervensi remedial.',
-  interpretasiHasil:
-    'Nilai rata-rata kelas (79,07) dan median (80,5) berada di atas batas ketuntasan minimal 75, yang menunjukkan mayoritas peserta didik mampu menguasai kompetensi dasar materi semester. Namun, rentang nilai sebesar 38 poin (tertinggi 96 dan terendah 58) dengan simpangan baku 10,77 menandakan adanya kesenjangan penguasaan materi antar kelompok siswa sehingga pendampingan diferensiasi sangat diperlukan.',
-  analisisSebaranNilai:
-    'Kelompok berprestasi tinggi (nilai 90–100) berjumlah 6 siswa (20%) dan kelompok baik (80–89) sebanyak 10 siswa (33,3%). Kelompok batas bawah ketuntasan (70–79) berjumlah 5 siswa yang rawan mengalami miskonsepsi jika soal ditingkatkan ke level HOTS, sedangkan 9 siswa berada pada kategori di bawah KKTP (nilai 58–74).',
-  rekomendasiRemedial: [
-    'Karena proporsi siswa belum tuntas berada pada rentang 20%–50% (30,0%), laksanakan pembelajaran remedial dalam bentuk bimbingan kelompok kecil (9 siswa dibagi menjadi 2–3 kelompok) dengan fokus pada indikator soal yang paling sering gagal.',
-    'Terapkan metode tutor sebaya dengan memasangkan siswa peraih nilai >= 90 (Fitri, Aisyah, Zahra, Rani, Citra, Melati) bersama siswa pada rentang nilai 65–74 untuk latihan soal terstruktur.',
-    'Berikan asesmen ulang (tes remedial) menggunakan butir soal setara pada indikator yang belum dikuasai hingga mencapai minimal nilai KKTP 75.',
-  ],
-  rekomendasiPengayaan: [
-    'Berikan tantangan proyek pemecahan masalah kontekstual level C5–C6 (HOTS) kepada 16 siswa yang meraih nilai >= 80.',
-    'Libatkan siswa berprestasi puncak (>= 90) sebagai fasilitator diskusi dalam kelompok belajar kelas.',
-    'Sediakan materi perluasan lintas topik atau soal setara olimpiade SMP untuk menjaga motivasi belajar siswa cepat tanggap.',
-  ],
-  tindakLanjutPembelajaranGuru: [
-    'Lakukan analisis butir soal untuk mengidentifikasi indikator mana yang paling banyak menyebabkan siswa pada rentang nilai 58–74 gagal menjawab.',
-    'Tingkatkan proporsi latihan soal bertahap dari level C2–C3 menuju C4 sebelum ujian akhir berlangsung agar siswa batas aman tidak terkejut pada soal penalaran.',
-    'Terapkan asesmen formatif singkat (exit ticket) di akhir tiap sub-bab untuk mendeteksi kesulitan belajar lebih dini sebelum sumatif semester.',
-  ],
-};
-
 export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
   blueprint,
 }) => {
-  const [rawInput, setRawInput] = useState<string>(SAMPLE_STUDENT_SCORES);
+  const [rawInput, setRawInput] = useState<string>('');
   const [kktp, setKktp] = useState<number>(75);
   const [mataPelajaran, setMataPelajaran] = useState<string>(
     blueprint.config.mataPelajaran
@@ -106,8 +78,7 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
     GRADE_LABELS[blueprint.config.kelas]
   );
 
-  const [narrative, setNarrative] =
-    useState<ScoreAnalysisNarrative>(INITIAL_NARRATIVE);
+  const [narrative, setNarrative] = useState<ScoreAnalysisNarrative | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -118,16 +89,19 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
   const [subTab, setSubTab] = useState<'statistik' | 'laporan'>('statistik');
 
   const [evaluationReport, setEvaluationReport] =
-    useState<LearningEvaluationReport>(() => {
+    useState<LearningEvaluationReport | null>(() => {
       try {
         const raw = localStorage.getItem(STORAGE_REPORT_KEY);
         if (raw) {
-          return JSON.parse(raw) as LearningEvaluationReport;
+          const parsed = JSON.parse(raw) as LearningEvaluationReport;
+          if (parsed.id !== 'laporan-initial-mat8') {
+            return parsed;
+          }
         }
       } catch {
-        // Fallback to initial curated report
+        // Fallback null
       }
-      return INITIAL_LEARNING_REPORT;
+      return null;
     });
 
   const [formSubmissions] = useState<ExamFormSubmission[]>(() => {
@@ -144,10 +118,14 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_REPORT_KEY,
-        JSON.stringify(evaluationReport)
-      );
+      if (evaluationReport) {
+        localStorage.setItem(
+          STORAGE_REPORT_KEY,
+          JSON.stringify(evaluationReport)
+        );
+      } else {
+        localStorage.removeItem(STORAGE_REPORT_KEY);
+      }
     } catch {
       // Ignore storage quota errors
     }
@@ -164,6 +142,29 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
     () => computeScoreStatistics(records, kktp),
     [records, kktp]
   );
+
+  const resolvedNarrative: ScoreAnalysisNarrative | null = useMemo(() => {
+    if (stats.totalSiswa === 0) return null;
+    if (narrative) return narrative;
+    return generateLocalScoreInterpretation({
+      mataPelajaran,
+      kelasLabel,
+      materiPokok: blueprint.config.materiPokok,
+      kktp,
+      stats,
+      daftarBelumTuntas: records
+        .filter((r) => r.nilai < kktp)
+        .map((r) => ({ nama: r.nama, nilai: r.nilai })),
+    });
+  }, [
+    narrative,
+    stats,
+    mataPelajaran,
+    kelasLabel,
+    blueprint.config.materiPokok,
+    kktp,
+    records,
+  ]);
 
   const activeAnalisisSummary = useMemo(() => {
     if (stats.totalSiswa === 0) {
@@ -187,13 +188,19 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
       `- Siswa Belum Tuntas (< ${kktp}): ${stats.jumlahBelumTuntas} siswa (${stats.persentaseBelumTuntas}%)`,
       `- Distribusi Rentang Nilai: ${distribusiText}`,
       belumTuntasList ? `- Daftar Siswa Belum Tuntas: ${belumTuntasList}` : '',
-      `- Status Ketuntasan Klasikal: ${narrative.statusKetuntasanKlasikal}`,
-      `- Ringkasan & Interpretasi: ${narrative.ringkasanEksekutif} ${narrative.interpretasiHasil}`,
-      `- Analisis Sebaran: ${narrative.analisisSebaranNilai}`,
+      resolvedNarrative
+        ? `- Status Ketuntasan Klasikal: ${resolvedNarrative.statusKetuntasanKlasikal}`
+        : '',
+      resolvedNarrative
+        ? `- Ringkasan & Interpretasi: ${resolvedNarrative.ringkasanEksekutif} ${resolvedNarrative.interpretasiHasil}`
+        : '',
+      resolvedNarrative
+        ? `- Analisis Sebaran: ${resolvedNarrative.analisisSebaranNilai}`
+        : '',
     ]
       .filter(Boolean)
       .join('\n');
-  }, [stats, records, kktp, mataPelajaran, kelasLabel, narrative]);
+  }, [stats, records, kktp, mataPelajaran, kelasLabel, resolvedNarrative]);
 
   const filteredRecords = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -243,16 +250,19 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
         .filter((r) => r.nilai < kktp)
         .map((r) => ({ nama: r.nama, nilai: r.nilai }));
 
+      const payload = {
+        mataPelajaran,
+        kelasLabel,
+        materiPokok: blueprint.config.materiPokok,
+        kktp,
+        stats,
+        daftarBelumTuntas,
+      };
+
       const data = await postApiJson<ScoreAnalysisNarrative>(
         '/api/analisis-hasil/interpretasi',
-        {
-          mataPelajaran,
-          kelasLabel,
-          materiPokok: blueprint.config.materiPokok,
-          kktp,
-          stats,
-          daftarBelumTuntas,
-        }
+        payload,
+        () => generateLocalScoreInterpretation(payload)
       );
 
       setNarrative(data);
@@ -394,14 +404,21 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
                 )}
                 <button
                   type="button"
-                  onClick={() => setRawInput(SAMPLE_STUDENT_SCORES)}
+                  onClick={() => {
+                    setRawInput(SAMPLE_STUDENT_SCORES);
+                    setNarrative(null);
+                  }}
                   className="text-xs font-medium text-blue-800 hover:underline"
                 >
                   Muat contoh 30 siswa
                 </button>
                 <button
                   type="button"
-                  onClick={() => setRawInput('')}
+                  onClick={() => {
+                    setRawInput('');
+                    setNarrative(null);
+                    setErrorMsg(null);
+                  }}
                   className="text-xs font-medium text-slate-500 hover:text-red-700"
                 >
                   Kosongkan
@@ -412,7 +429,10 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
               id="raw-scores-textarea"
               rows={8}
               value={rawInput}
-              onChange={(e) => setRawInput(e.target.value)}
+              onChange={(e) => {
+                setRawInput(e.target.value);
+                setNarrative(null);
+              }}
               placeholder={`Contoh format yang didukung:\n1\tAhmad Fauzi\t84\n2\tBunga Lestari\t72\natau: Budi Santoso, 85\natau: 78, 85, 92, 64`}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs leading-relaxed text-slate-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-700/15"
             />
@@ -560,7 +580,8 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!resolvedNarrative) return;
                     exportScoreAnalysisToWordDoc({
                       mataPelajaran,
                       kelasLabel,
@@ -568,9 +589,9 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
                       kktp,
                       records,
                       stats,
-                      narrative,
-                    })
-                  }
+                      narrative: resolvedNarrative,
+                    });
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 whitespace-nowrap"
                 >
                   <FileText className="h-3.5 w-3.5" aria-hidden="true" />
@@ -735,93 +756,95 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
             </div>
           </section>
 
-          <section
-            aria-labelledby="interpretation-heading"
-            className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <h2
-                  id="interpretation-heading"
-                  className="font-display text-base font-semibold text-slate-900"
+          {resolvedNarrative && (
+            <section
+              aria-labelledby="interpretation-heading"
+              className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <h2
+                    id="interpretation-heading"
+                    className="font-display text-base font-semibold text-slate-900"
+                  >
+                    Interpretasi Hasil Evaluasi & Rekomendasi Tindak Lanjut
+                  </h2>
+                  <p className="mt-1 text-xs font-medium text-slate-700">
+                    Status Klasikal:{' '}
+                    <span className="text-blue-900 font-semibold">
+                      {resolvedNarrative.statusKetuntasanKlasikal}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubTab('laporan')}
+                  className="no-print inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-100 transition-colors whitespace-nowrap"
                 >
-                  Interpretasi Hasil Evaluasi & Rekomendasi Tindak Lanjut
-                </h2>
-                <p className="mt-1 text-xs font-medium text-slate-700">
-                  Status Klasikal:{' '}
-                  <span className="text-blue-900 font-semibold">
-                    {narrative.statusKetuntasanKlasikal}
-                  </span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSubTab('laporan')}
-                className="no-print inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-100 transition-colors whitespace-nowrap"
-              >
-                <span>Susun Laporan Evaluasi Pembelajaran</span>
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-2">
-                <h3 className="text-xs font-semibold text-slate-900">
-                  Interpretasi Hasil Evaluasi
-                </h3>
-                <p className="text-xs leading-relaxed text-slate-700">
-                  {narrative.ringkasanEksekutif}
-                </p>
-                <p className="text-xs leading-relaxed text-slate-700">
-                  {narrative.interpretasiHasil}
-                </p>
+                  <span>Susun Laporan Evaluasi Pembelajaran</span>
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-2">
-                <h3 className="text-xs font-semibold text-slate-900">
-                  Analisis Sebaran & Heterogenitas Kelas
-                </h3>
-                <p className="text-xs leading-relaxed text-slate-700">
-                  {narrative.analisisSebaranNilai}
-                </p>
-              </div>
-            </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                  <h3 className="text-xs font-semibold text-slate-900">
+                    Interpretasi Hasil Evaluasi
+                  </h3>
+                  <p className="text-xs leading-relaxed text-slate-700">
+                    {resolvedNarrative.ringkasanEksekutif}
+                  </p>
+                  <p className="text-xs leading-relaxed text-slate-700">
+                    {resolvedNarrative.interpretasiHasil}
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <div className="rounded-lg border border-red-200 bg-red-50/35 p-4">
-                <h3 className="text-xs font-semibold text-red-950 mb-2">
-                  Program Remedial ({stats.jumlahBelumTuntas} Siswa Belum Tuntas)
-                </h3>
-                <ul className="space-y-1.5 text-xs leading-relaxed text-slate-800 list-disc pl-4">
-                  {narrative.rekomendasiRemedial.map((item, idx) => (
-                    <li key={idx}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50/35 p-4">
-                <h3 className="text-xs font-semibold text-emerald-950 mb-2">
-                  Program Pengayaan ({stats.jumlahTuntas} Siswa Tuntas)
-                </h3>
-                <ul className="space-y-1.5 text-xs leading-relaxed text-slate-800 list-disc pl-4">
-                  {narrative.rekomendasiPengayaan.map((item, idx) => (
-                    <li key={idx}>{item}</li>
-                  ))}
-                </ul>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+                  <h3 className="text-xs font-semibold text-slate-900">
+                    Analisis Sebaran & Heterogenitas Kelas
+                  </h3>
+                  <p className="text-xs leading-relaxed text-slate-700">
+                    {resolvedNarrative.analisisSebaranNilai}
+                  </p>
+                </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
-                <h3 className="text-xs font-semibold text-slate-900 mb-2">
-                  Refleksi & Perbaikan Pembelajaran Guru
-                </h3>
-                <ul className="space-y-1.5 text-xs leading-relaxed text-slate-700 list-disc pl-4">
-                  {narrative.tindakLanjutPembelajaranGuru.map((item, idx) => (
-                    <li key={idx}>{item}</li>
-                  ))}
-                </ul>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div className="rounded-lg border border-red-200 bg-red-50/35 p-4">
+                  <h3 className="text-xs font-semibold text-red-950 mb-2">
+                    Program Remedial ({stats.jumlahBelumTuntas} Siswa Belum Tuntas)
+                  </h3>
+                  <ul className="space-y-1.5 text-xs leading-relaxed text-slate-800 list-disc pl-4">
+                    {resolvedNarrative.rekomendasiRemedial.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/35 p-4">
+                  <h3 className="text-xs font-semibold text-emerald-950 mb-2">
+                    Program Pengayaan ({stats.jumlahTuntas} Siswa Tuntas)
+                  </h3>
+                  <ul className="space-y-1.5 text-xs leading-relaxed text-slate-800 list-disc pl-4">
+                    {resolvedNarrative.rekomendasiPengayaan.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+                  <h3 className="text-xs font-semibold text-slate-900 mb-2">
+                    Refleksi & Perbaikan Pembelajaran Guru
+                  </h3>
+                  <ul className="space-y-1.5 text-xs leading-relaxed text-slate-700 list-disc pl-4">
+                    {resolvedNarrative.tindakLanjutPembelajaranGuru.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           <section
             aria-labelledby="student-table-heading"

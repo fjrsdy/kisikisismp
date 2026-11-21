@@ -24,6 +24,10 @@ import type {
 } from './types/kisiKisi';
 import { postApiJson } from './utils/apiClient';
 import {
+  generateLocalKisiKisi,
+  generateLocalSampleItem,
+} from './utils/localEvaluationEngine';
+import {
   buildMarkdownTable,
   exportToCSV,
   exportToWordDoc,
@@ -152,7 +156,9 @@ export default function App() {
       const data = await postApiJson<{
         rows?: Omit<KisiRow, 'id'>[];
         catatanAhliEvaluasi?: string;
-      }>('/api/kisi-kisi/generate', blueprint.config);
+      }>('/api/kisi-kisi/generate', blueprint.config, () =>
+        generateLocalKisiKisi(blueprint.config)
+      );
 
       const formattedRows: KisiRow[] = (data.rows || []).map(
         (r: Omit<KisiRow, 'id'>, idx: number) => ({
@@ -192,7 +198,8 @@ export default function App() {
         {
           config: blueprint.config,
           row,
-        }
+        },
+        () => generateLocalSampleItem(blueprint.config, row)
       );
       setSampleItem(data);
     } catch (err: unknown) {

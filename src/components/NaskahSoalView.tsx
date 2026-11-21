@@ -20,6 +20,7 @@ import type {
 } from '../types/kisiKisi';
 import { postApiJson } from '../utils/apiClient';
 import { buildMarkdownTable, exportExamPaperToWordDoc } from '../utils/exportBlueprint';
+import { generateLocalExamPaper } from '../utils/localEvaluationEngine';
 import { FormUjianView } from './FormUjianView';
 
 interface NaskahSoalViewProps {
@@ -87,22 +88,25 @@ export const NaskahSoalView: React.FC<NaskahSoalViewProps> = ({
     setIsGenerating(true);
     setErrorMsg(null);
 
+    const payload = {
+      kisiKisiText: kisiPayload,
+      mataPelajaran: blueprint.config.mataPelajaran,
+      kelasLabel: GRADE_LABELS[blueprint.config.kelas],
+      semesterLabel: SEMESTER_LABELS[blueprint.config.semester],
+      jenisUjian: blueprint.config.jenisUjian,
+      namaSekolah: blueprint.config.namaSekolah,
+      tahunAjaran: blueprint.config.tahunAjaran,
+      alokasiWaktu: blueprint.config.alokasiWaktu,
+      jumlahPG,
+      jumlahIsian,
+      jumlahUraian,
+    };
+
     try {
       const data = await postApiJson<ExamPaperPackage>(
         '/api/naskah-soal/generate',
-        {
-          kisiKisiText: kisiPayload,
-          mataPelajaran: blueprint.config.mataPelajaran,
-          kelasLabel: GRADE_LABELS[blueprint.config.kelas],
-          semesterLabel: SEMESTER_LABELS[blueprint.config.semester],
-          jenisUjian: blueprint.config.jenisUjian,
-          namaSekolah: blueprint.config.namaSekolah,
-          tahunAjaran: blueprint.config.tahunAjaran,
-          alokasiWaktu: blueprint.config.alokasiWaktu,
-          jumlahPG,
-          jumlahIsian,
-          jumlahUraian,
-        }
+        payload,
+        () => generateLocalExamPaper(payload)
       );
 
       onUpdateExamPaper(data);

@@ -15,131 +15,7 @@ import type {
 } from '../types/kisiKisi';
 import { postApiJson } from '../utils/apiClient';
 import { exportEvaluationReportToWordDoc } from '../utils/exportBlueprint';
-
-export const INITIAL_LEARNING_REPORT: LearningEvaluationReport = {
-  id: 'laporan-initial-mat8',
-  judulLaporan: 'Laporan Evaluasi Pembelajaran Sumatif Akhir Semester',
-  mataPelajaran: 'Matematika',
-  kelasLabel: 'Kelas VIII (2 SMP)',
-  semesterLabel: 'Semester 1 (Ganjil)',
-  namaSekolah: 'SMP Negeri 1 Nusantara',
-  tahunAjaran: '2026/2027',
-  ringkasanHasilBelajar:
-    'Berdasarkan hasil asesmen sumatif semester terhadap 30 peserta didik Kelas VIII pada mata pelajaran Matematika dengan KKTP 75, diperoleh nilai rata-rata kelas sebesar 79,07, median 80,5, simpangan baku 10,77, nilai tertinggi 96, dan nilai terendah 58. Sebanyak 21 peserta didik (70,0%) telah mencapai ketuntasan belajar, sedangkan 9 peserta didik (30,0%) belum mencapai KKTP sehingga memerlukan program remedial terstruktur sebelum melangkah ke kompetensi semester berikutnya.',
-  ketercapaianTP: [
-    {
-      no: 1,
-      tujuanPembelajaran:
-        'Menyederhanakan operasi bilangan berpangkat bulat positif, negatif, dan bentuk akar sederhana',
-      materi: 'Bilangan Berpangkat dan Bentuk Akar',
-      tingkatKetercapaian: 'Tercapai Penuh',
-      persentaseCapaian: '86%',
-      catatanBukti:
-        'Mayoritas siswa menguasai sifat perkalian dan pembagian pangkat serta penjumlahan bentuk akar sejenis pada soal C1–C3.',
-    },
-    {
-      no: 2,
-      tujuanPembelajaran:
-        'Menentukan panjang sisi segitiga siku-siku dan mengidentifikasi tripel Pythagoras pada masalah bangun datar',
-      materi: 'Teorema Pythagoras',
-      tingkatKetercapaian: 'Tercapai Penuh',
-      persentaseCapaian: '82%',
-      catatanBukti:
-        'Siswa mampu menerapkan rumus kuadrat sisi miring secara tepat, meski sebagian kecil masih kurang teliti pada soal cerita kontekstual.',
-    },
-    {
-      no: 3,
-      tujuanPembelajaran:
-        'Menentukan gradien garis lurus dan menyusun persamaan garis melalui dua titik atau sejajar/tegak lurus garis lain',
-      materi: 'Persamaan Garis Lurus',
-      tingkatKetercapaian: 'Tercapai Sebagian',
-      persentaseCapaian: '68%',
-      catatanBukti:
-        'Kesalahan umum terjadi saat menentukan gradien garis yang saling tegak lurus (m1 × m2 = -1) dan mengubah bentuk ax + by + c = 0 ke y = mx + c.',
-    },
-    {
-      no: 4,
-      tujuanPembelajaran:
-        'Menyelesaikan Sistem Persamaan Linear Dua Variabel (SPLDV) dan memodelkan masalah harga/kuantitas dalam kehidupan sehari-hari',
-      materi: 'Sistem Persamaan Linear Dua Variabel (SPLDV)',
-      tingkatKetercapaian: 'Belum Tercapai',
-      persentaseCapaian: '59%',
-      catatanBukti:
-        'Peserta didik pada rentang nilai 58–74 masih kesulitan menerjemahkan kalimat cerita menjadi dua model persamaan aljabar dan keliru tanda operasi saat metode eliminasi.',
-    },
-  ],
-  materiDikuasai: [
-    {
-      materi: 'Sifat Operasi Bilangan Berpangkat & Bentuk Akar',
-      alasanBukti:
-        'Tingkat ketuntasan indikator mencapai 86%; siswa konsisten menjawab benar pada operasi pangkat dan penyederhanaan akar rutin.',
-    },
-    {
-      materi: 'Penerapan Dasar Teorema Pythagoras',
-      alasanBukti:
-        'Sebanyak 82% siswa mampu menghitung panjang hipotenusa maupun sisi siku-siku segitiga menggunakan relasi kuadrat.',
-    },
-    {
-      materi: 'Identifikasi Gradien dari Persamaan Eksplisit y = mx + c',
-      alasanBukti:
-        'Siswa kelompok tuntas dan batas aman sudah lancar membaca koefisien kemiringan langsung dari persamaan linear bentuk baku.',
-    },
-  ],
-  materiPerluDiperbaiki: [
-    {
-      materi: 'Pemodelan Masalah Kontekstual ke SPLDV',
-      alasanBukti:
-        'Capaian indikator hanya 59%; siswa kerap tertukar dalam mendefinisikan variabel x dan y serta melakukan kesalahan tanda negatif saat eliminasi.',
-    },
-    {
-      materi: 'Hubungan Gradien Garis Sejajar dan Tegak Lurus',
-      alasanBukti:
-        'Sebagian siswa menganggap garis tegak lurus memiliki gradien berlawanan tanda saja (-m) tanpa membalik pecahan (-1/m).',
-    },
-    {
-      materi: 'Soal Penalaran Multi-Langkah (Level C4–C5)',
-      alasanBukti:
-        'Siswa pada rentang nilai 70–79 masih membutuhkan bantuan pemecahan langkah (scaffolding) untuk menghubungkan dua konsep dalam satu stimulus.',
-    },
-  ],
-  rekomendasiRemedial: [
-    {
-      sasaran: 'Kelompok Intensif (Nilai < 65 · 3 Siswa)',
-      strategi: 'Pembelajaran ulang terbimbing (explicit teaching) dalam kelompok sangat kecil',
-      bentukAktivitas:
-        'Pendampingan langkah demi langkah menerjemahkan soal cerita menjadi model SPLDV menggunakan kartu variabel dan latihan eliminasi bertahap tanpa bilangan pecahan.',
-      targetKetuntasan: 'Mencapai minimal nilai KKTP 75 melalui tes ulang setara pada materi SPLDV & Gradien.',
-    },
-    {
-      sasaran: 'Kelompok Penguatan (Nilai 65–74 · 6 Siswa)',
-      strategi: 'Klinik konsep & tutor sebaya (peer tutoring)',
-      bentukAktivitas:
-        'Diskusi berpasangan membahas kesalahan umum tanda aljabar dan hubungan gradien tegak lurus dengan lembar kerja terstruktur berisi contoh terpecahkan (worked example).',
-      targetKetuntasan: 'Mampu menyelesaikan 80% soal aplikasi C3–C4 SPLDV dan Persamaan Garis Lurus dengan tepat.',
-    },
-  ],
-  rekomendasiPengayaan: [
-    {
-      sasaran: 'Kelompok Berprestasi Tinggi (Nilai ≥ 90 · 6 Siswa)',
-      strategi: 'Eksplorasi masalah HOTS & peran fasilitator kelas',
-      bentukAktivitas:
-        'Menyelesaikan tantangan pemodelan optimasi tiga variabel sederhana/lintas topik Pythagoras–Garis Lurus setara soal kompetisi SMP serta menjadi tutor sebaya terstruktur.',
-      luaranDiharapkan:
-        'Menghasilkan minimal 2 alternatif strategi penyelesaian soal non-rutin dan mempresentasikan pembuktiannya.',
-    },
-    {
-      sasaran: 'Kelompok Tuntas Baik (Nilai 75–89 · 15 Siswa)',
-      strategi: 'Proyek aplikasi kontekstual berbasis data nyata',
-      bentukAktivitas:
-        'Merancang studi kasus perbandingan tarif paket transportasi atau paket belanja menggunakan grafik persamaan garis lurus dan titik potong SPLDV.',
-      luaranDiharapkan:
-        'Laporan mini pemecahan masalah berbasis grafik linear dan interpretasi titik impas.',
-    },
-  ],
-  catatanPenutupGuru:
-    'Pada siklus pembelajaran semester berikutnya, guru perlu memperkuat fase jembatan dari representasi konkret/verbal ke bentuk simbol aljabar serta menyisipkan latihan soal penalaran C4 secara bertahap di setiap akhir sub-bab melalui asesmen formatif singkat (exit ticket).',
-  createdAt: new Date().toISOString(),
-};
+import { generateLocalLearningReport } from '../utils/localEvaluationEngine';
 
 const SAMPLE_PASTE_ANALISIS = `Hasil Analisis Sumatif Akhir Semester Matematika Kelas VIII (KKTP = 75, Jumlah Siswa = 30):
 - Rata-rata nilai: 79,07 | Median: 80,5 | Simpangan Baku: 10,77
@@ -152,8 +28,8 @@ const SAMPLE_PASTE_ANALISIS = `Hasil Analisis Sumatif Akhir Semester Matematika 
 interface LaporanEvaluasiViewProps {
   blueprint: KisiBlueprint;
   activeAnalisisSummary: string;
-  report: LearningEvaluationReport;
-  onUpdateReport: (next: LearningEvaluationReport) => void;
+  report: LearningEvaluationReport | null;
+  onUpdateReport: (next: LearningEvaluationReport | null) => void;
 }
 
 function getAchievementStyle(status: TPOAchievementItem['tingkatKetercapaian']) {
@@ -189,6 +65,7 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
   );
 
   const tpCounts = useMemo(() => {
+    if (!report) return { penuh: 0, sebagian: 0, belum: 0 };
     const penuh = report.ketercapaianTP.filter(
       (t) => t.tingkatKetercapaian === 'Tercapai Penuh'
     ).length;
@@ -199,7 +76,7 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
       (t) => t.tingkatKetercapaian === 'Belum Tercapai'
     ).length;
     return { penuh, sebagian, belum };
-  }, [report.ketercapaianTP]);
+  }, [report]);
 
   const handleGenerateReport = async () => {
     const sourceText =
@@ -217,18 +94,21 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
     setIsGenerating(true);
     setErrorMsg(null);
 
+    const payload = {
+      analisisText: sourceText,
+      mataPelajaran: blueprint.config.mataPelajaran,
+      kelasLabel: GRADE_LABELS[blueprint.config.kelas],
+      semesterLabel: SEMESTER_LABELS[blueprint.config.semester],
+      namaSekolah: blueprint.config.namaSekolah,
+      tahunAjaran: blueprint.config.tahunAjaran,
+      tujuanPembelajaranList: includeKisiTP ? tpListFromBlueprint : [],
+    };
+
     try {
       const data = await postApiJson<LearningEvaluationReport>(
         '/api/laporan-evaluasi/generate',
-        {
-          analisisText: sourceText,
-          mataPelajaran: blueprint.config.mataPelajaran,
-          kelasLabel: GRADE_LABELS[blueprint.config.kelas],
-          semesterLabel: SEMESTER_LABELS[blueprint.config.semester],
-          namaSekolah: blueprint.config.namaSekolah,
-          tahunAjaran: blueprint.config.tahunAjaran,
-          tujuanPembelajaranList: includeKisiTP ? tpListFromBlueprint : [],
-        }
+        payload,
+        () => generateLocalLearningReport(payload)
       );
 
       onUpdateReport(data);
@@ -244,6 +124,7 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
   };
 
   const handleCopyPlainReport = async () => {
+    if (!report) return;
     const lines: string[] = [
       `${report.judulLaporan.toUpperCase()}`,
       `${report.namaSekolah} | ${report.mataPelajaran} | ${report.kelasLabel} | ${report.semesterLabel} | TA ${report.tahunAjaran}`,
@@ -351,7 +232,8 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
               </span>
             </div>
             <pre className="max-h-44 overflow-y-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-white p-3 font-mono text-xs leading-relaxed text-slate-700">
-              {activeAnalisisSummary}
+              {activeAnalisisSummary ||
+                'Belum ada data nilai siswa aktif. Silakan masukkan data nilai pada tab Analisis Statistik Nilai atau pilih mode Tempel Hasil Analisis.'}
             </pre>
           </div>
         ) : (
@@ -443,6 +325,16 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
         )}
       </section>
 
+      {!report ? (
+        <section className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+          <p className="text-sm font-medium text-slate-700">
+            Belum ada Laporan Evaluasi Pembelajaran yang disusun.
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Masukkan data nilai siswa pada tab <strong>Analisis Statistik Nilai</strong> atau tempelkan ringkasan hasil analisis di atas, lalu klik &ldquo;Susun Laporan Evaluasi Pembelajaran&rdquo;.
+          </p>
+        </section>
+      ) : (
       <article className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8 space-y-7 print:border-0 print:p-0">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
@@ -495,6 +387,13 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
             >
               <Printer className="h-3.5 w-3.5" aria-hidden="true" />
               <span>Cetak / PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateReport(null)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-red-700 whitespace-nowrap"
+            >
+              <span>Kosongkan</span>
             </button>
           </div>
         </header>
@@ -724,6 +623,7 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
           </div>
         </footer>
       </article>
+      )}
     </div>
   );
 };

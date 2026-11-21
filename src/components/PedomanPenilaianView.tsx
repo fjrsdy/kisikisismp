@@ -15,6 +15,7 @@ import type {
 } from '../types/kisiKisi';
 import { postApiJson } from '../utils/apiClient';
 import { exportAssessmentGuideToWordDoc } from '../utils/exportBlueprint';
+import { generateLocalAssessmentGuide } from '../utils/localEvaluationEngine';
 
 interface PedomanPenilaianViewProps {
   blueprint: KisiBlueprint;
@@ -258,22 +259,25 @@ export const PedomanPenilaianView: React.FC<PedomanPenilaianViewProps> = ({
     setIsGenerating(true);
     setErrorMsg(null);
 
+    const payload = {
+      rawExamText: textToAnalyze,
+      mataPelajaran:
+        sourceMode === 'active' && examPaper
+          ? examPaper.mataPelajaran
+          : blueprint.config.mataPelajaran,
+      kelasLabel:
+        sourceMode === 'active' && examPaper
+          ? examPaper.kelasLabel
+          : GRADE_LABELS[blueprint.config.kelas],
+      bobotPGPerSoal: bobotPG,
+      bobotIsianPerSoal: bobotIsian,
+    };
+
     try {
       const data = await postApiJson<AssessmentGuidePackage>(
         '/api/pedoman-penilaian/generate',
-        {
-          rawExamText: textToAnalyze,
-          mataPelajaran:
-            sourceMode === 'active' && examPaper
-              ? examPaper.mataPelajaran
-              : blueprint.config.mataPelajaran,
-          kelasLabel:
-            sourceMode === 'active' && examPaper
-              ? examPaper.kelasLabel
-              : GRADE_LABELS[blueprint.config.kelas],
-          bobotPGPerSoal: bobotPG,
-          bobotIsianPerSoal: bobotIsian,
-        }
+        payload,
+        () => generateLocalAssessmentGuide(payload)
       );
 
       onUpdateGuide(data);
@@ -467,7 +471,7 @@ export const PedomanPenilaianView: React.FC<PedomanPenilaianViewProps> = ({
                       </button>
                     </div>
                     <p className="text-xs leading-relaxed text-slate-600">
-                      Gunakan <strong>Konversi Instan</strong> untuk membentuk pedoman penilaian langsung dari kunci naskah aktif, atau klik tombol <strong>Susun Kunci & Rubrik Lengkap</strong> di samping untuk memperkaya alternatif jawaban dan rubrik bertahap melalui AI.
+                      Gunakan <strong>Konversi Instan</strong> untuk membentuk pedoman penilaian langsung dari kunci naskah aktif, atau klik tombol <strong>Susun Kunci & Rubrik Lengkap</strong> di samping untuk membentuk alternatif jawaban dan rubrik bertahap secara terstruktur.
                     </p>
                   </div>
                 ) : (
