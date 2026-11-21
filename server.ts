@@ -166,7 +166,7 @@ Aturan Penulisan Ahli Evaluasi Pendidikan:
 
     const response = await withRetry(() =>
       ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
+        model: 'gemini-3.1-flash-lite',
         contents: prompt,
         config: {
           systemInstruction:
@@ -283,7 +283,7 @@ Ketentuan:
 
     const response = await withRetry(() =>
       ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
+        model: 'gemini-3.1-flash-lite',
         contents: prompt,
         config: {
           systemInstruction:
@@ -532,7 +532,7 @@ Kaidah Penyusunan Soal Profesional:
       if (count <= 0) return [];
       const resp = await withRetry(() =>
         ai.models.generateContent({
-          model: 'gemini-4-hydrogen',
+          model: 'gemini-3.1-flash-lite',
           contents: `${baseContext}\nTugas Khusus:\nBuatlah TEPAT ${count} soal PILIHAN GANDA bernomor ${startNo} sampai ${endNo} (${focusHint}). Pastikan setiap nomor dari ${startNo} hingga ${endNo} lengkap berurutan dan bervariasi tingkat kesulitannya.`,
           config: {
             systemInstruction:
@@ -558,7 +558,7 @@ Kaidah Penyusunan Soal Profesional:
       }
       const resp = await withRetry(() =>
         ai.models.generateContent({
-          model: 'gemini-4-hydrogen',
+          model: 'gemini-3.1-flash-lite',
           contents: `${baseContext}\nTugas Khusus:\n1. Buatlah TEPAT ${isianCount} soal ISIAN SINGKAT bernomor 1 sampai ${isianCount}.\n2. Buatlah TEPAT ${uraianCount} soal URAIAN bernomor 1 sampai ${uraianCount} (fokus level MOTS/HOTS C3–C6 dengan pedoman penskoran terperinci dan skorMaksimal antara 4–10 per soal).\nPastikan seluruh nomor lengkap berurutan dan selaras dengan indikator pada kisi-kisi.`,
           config: {
             systemInstruction:
@@ -686,7 +686,7 @@ Aturan Wajib:
 
     const response = await withRetry(() =>
       ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
+        model: 'gemini-3.1-flash-lite',
         contents: prompt,
         config: {
           systemInstruction:
@@ -878,7 +878,7 @@ Ketentuan Analisis:
 
     const response = await withRetry(() =>
       ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
+        model: 'gemini-3.1-flash-lite',
         contents: prompt,
         config: {
           systemInstruction:
@@ -988,7 +988,7 @@ Komponen Wajib Laporan:
 
     const response = await withRetry(() =>
       ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
+        model: 'gemini-3.1-flash-lite',
         contents: prompt,
         config: {
           systemInstruction:
@@ -1119,6 +1119,10 @@ Komponen Wajib Laporan:
         : 'Gagal menyusun laporan evaluasi pembelajaran.';
     res.status(500).json({ error: message });
   }
+});
+
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
 });
 
 app.all('/api/*', (_req, res) => {

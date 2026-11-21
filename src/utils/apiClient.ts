@@ -1,3 +1,25 @@
+function extractErrorMessage(parsed: unknown): string | null {
+  if (!parsed || typeof parsed !== 'object') return null;
+  const obj = parsed as Record<string, unknown>;
+
+  if (typeof obj.error === 'string' && obj.error.trim()) {
+    return obj.error.trim();
+  }
+  if (obj.error && typeof obj.error === 'object') {
+    const nested = obj.error as Record<string, unknown>;
+    if (typeof nested.message === 'string' && nested.message.trim()) {
+      return nested.message.trim();
+    }
+  }
+  if (typeof obj.message === 'string' && obj.message.trim()) {
+    return obj.message.trim();
+  }
+  if (typeof obj.detail === 'string' && obj.detail.trim()) {
+    return obj.detail.trim();
+  }
+  return null;
+}
+
 export async function postApiJson<TResponse>(
   url: string,
   payload: unknown
@@ -24,11 +46,18 @@ export async function postApiJson<TResponse>(
 
   if (parsed && typeof parsed === 'object') {
     if (!response.ok) {
-      const errMsg =
-        'error' in parsed && typeof (parsed as { error?: unknown }).error === 'string'
-          ? (parsed as { error: string }).error
-          : `Permintaan gagal diproses oleh server (HTTP ${response.status}).`;
-      throw new Error(errMsg);
+      const extracted = extractErrorMessage(parsed);
+      if (response.status === 404) {
+        throw new Error(
+          extracted
+            ? `Layanan API tidak ditemukan (${extracted}). Muat ulang halaman atau mulai ulang server aplikasi.`
+            : `Endpoint layanan ${url} tidak ditemukan (HTTP 404). Muat ulang halaman atau pastikan server backend sedang berjalan.`
+        );
+      }
+      throw new Error(
+        extracted ||
+          `Permintaan gagal diproses oleh server (HTTP ${response.status}).`
+      );
     }
     return parsed as TResponse;
   }
@@ -48,7 +77,7 @@ export async function postApiJson<TResponse>(
 
   if (response.status === 404) {
     throw new Error(
-      'Layanan API tidak ditemukan (HTTP 404). Muat ulang halaman atau mulai ulang server aplikasi.'
+      `Endpoint layanan ${url} tidak ditemukan (HTTP 404). Muat ulang halaman atau pastikan server backend sedang berjalan.`
     );
   }
 
