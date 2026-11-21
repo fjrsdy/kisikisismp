@@ -13,6 +13,7 @@ import type {
   LearningEvaluationReport,
   TPOAchievementItem,
 } from '../types/kisiKisi';
+import { postApiJson } from '../utils/apiClient';
 import { exportEvaluationReportToWordDoc } from '../utils/exportBlueprint';
 
 export const INITIAL_LEARNING_REPORT: LearningEvaluationReport = {
@@ -217,10 +218,9 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
     setErrorMsg(null);
 
     try {
-      const response = await fetch('/api/laporan-evaluasi/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<LearningEvaluationReport>(
+        '/api/laporan-evaluasi/generate',
+        {
           analisisText: sourceText,
           mataPelajaran: blueprint.config.mataPelajaran,
           kelasLabel: GRADE_LABELS[blueprint.config.kelas],
@@ -228,17 +228,10 @@ export const LaporanEvaluasiView: React.FC<LaporanEvaluasiViewProps> = ({
           namaSekolah: blueprint.config.namaSekolah,
           tahunAjaran: blueprint.config.tahunAjaran,
           tujuanPembelajaranList: includeKisiTP ? tpListFromBlueprint : [],
-        }),
-      });
+        }
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(
-          data?.error || 'Gagal menyusun laporan evaluasi pembelajaran.'
-        );
-      }
-
-      onUpdateReport(data as LearningEvaluationReport);
+      onUpdateReport(data);
     } catch (err: unknown) {
       setErrorMsg(
         err instanceof Error

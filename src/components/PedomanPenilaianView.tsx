@@ -13,6 +13,7 @@ import type {
   ExamPaperPackage,
   KisiBlueprint,
 } from '../types/kisiKisi';
+import { postApiJson } from '../utils/apiClient';
 import { exportAssessmentGuideToWordDoc } from '../utils/exportBlueprint';
 
 interface PedomanPenilaianViewProps {
@@ -258,10 +259,9 @@ export const PedomanPenilaianView: React.FC<PedomanPenilaianViewProps> = ({
     setErrorMsg(null);
 
     try {
-      const response = await fetch('/api/pedoman-penilaian/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<AssessmentGuidePackage>(
+        '/api/pedoman-penilaian/generate',
+        {
           rawExamText: textToAnalyze,
           mataPelajaran:
             sourceMode === 'active' && examPaper
@@ -273,15 +273,10 @@ export const PedomanPenilaianView: React.FC<PedomanPenilaianViewProps> = ({
               : GRADE_LABELS[blueprint.config.kelas],
           bobotPGPerSoal: bobotPG,
           bobotIsianPerSoal: bobotIsian,
-        }),
-      });
+        }
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Gagal menyusun kunci dan pedoman penilaian.');
-      }
-
-      onUpdateGuide(data as AssessmentGuidePackage);
+      onUpdateGuide(data);
     } catch (err: unknown) {
       setErrorMsg(
         err instanceof Error

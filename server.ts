@@ -27,16 +27,43 @@ function getAiClient(): GoogleGenAI {
   });
 }
 
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 1,
+  timeoutMs = 45000
+): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      const result = await Promise.race<T>([
+        fn(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  'Permintaan ke layanan AI melewati batas waktu (45 detik). Silakan coba lagi.'
+                )
+              ),
+            timeoutMs
+          )
+        ),
+      ]);
+      return result;
     } catch (error) {
       lastError = error;
-      if (attempt < maxRetries) {
+      const msg = error instanceof Error ? error.message.toLowerCase() : '';
+      const isTransient =
+        msg.includes('429') ||
+        msg.includes('503') ||
+        msg.includes('overloaded') ||
+        msg.includes('econnreset') ||
+        msg.includes('fetch failed');
+      if (attempt < maxRetries && isTransient) {
         const delayMs = 600 * Math.pow(2, attempt);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        break;
       }
     }
   }
@@ -546,14 +573,16 @@ Kaidah Penyusunan Soal Profesional:
     };
 
     const pgTasks: Promise<unknown[]>[] = [];
-    if (pgCount > 15) {
-      const mid = Math.ceil(pgCount / 2);
-      pgTasks.push(
-        generatePGBatch(1, mid, 'fokus pada bagian awal indikator/materi kisi-kisi'),
-        generatePGBatch(mid + 1, pgCount, 'fokus pada bagian lanjutan indikator/materi kisi-kisi')
-      );
-    } else if (pgCount > 0) {
-      pgTasks.push(generatePGBatch(1, pgCount, 'mencakup seluruh indikator pada kisi-kisi'));
+    const batchSize = 8;
+    for (let start = 1; start <= pgCount; start += batchSize) {
+      const end = Math.min(pgCount, start + batchSize - 1);
+      const hint =
+        start === 1
+          ? 'fokus pada indikator awal kisi-kisi'
+          : end === pgCount
+            ? 'fokus pada indikator akhir kisi-kisi'
+            : 'fokus pada indikator tengah kisi-kisi';
+      pgTasks.push(generatePGBatch(start, end, hint));
     }
 
     const [pgBatches, isianUraianResult] = await Promise.all([
@@ -1091,6 +1120,23 @@ Komponen Wajib Laporan:
     res.status(500).json({ error: message });
   }
 });
+
+app.all('/api/*', (_req, res) => {
+  res.status(404).json({ error: 'Endpoint API tidak ditemukan.' });
+});
+
+app.use(
+  (
+    err: unknown,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    const message =
+      err instanceof Error ? err.message : 'Terjadi kesalahan pada server.';
+    res.status(500).json({ error: message });
+  }
+);
 
 async function startServer() {
   const port = 3000;

@@ -22,6 +22,7 @@ import type {
   KisiBlueprint,
   KisiRow,
 } from './types/kisiKisi';
+import { postApiJson } from './utils/apiClient';
 import {
   buildMarkdownTable,
   exportToCSV,
@@ -148,18 +149,10 @@ export default function App() {
     setGenerateError(null);
 
     try {
-      const response = await fetch('/api/kisi-kisi/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(blueprint.config),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(
-          data?.error || 'Gagal menyusun kisi-kisi dari server evaluasi.'
-        );
-      }
+      const data = await postApiJson<{
+        rows?: Omit<KisiRow, 'id'>[];
+        catatanAhliEvaluasi?: string;
+      }>('/api/kisi-kisi/generate', blueprint.config);
 
       const formattedRows: KisiRow[] = (data.rows || []).map(
         (r: Omit<KisiRow, 'id'>, idx: number) => ({
@@ -194,19 +187,14 @@ export default function App() {
     setIsLoadingSample(true);
 
     try {
-      const response = await fetch('/api/kisi-kisi/sample-item', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<GeneratedSampleItem>(
+        '/api/kisi-kisi/sample-item',
+        {
           config: blueprint.config,
           row,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Gagal menyusun contoh butir soal.');
-      }
-      setSampleItem(data as GeneratedSampleItem);
+        }
+      );
+      setSampleItem(data);
     } catch (err: unknown) {
       setSampleError(
         err instanceof Error

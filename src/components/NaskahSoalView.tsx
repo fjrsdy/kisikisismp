@@ -18,6 +18,7 @@ import type {
   MultipleChoiceQuestion,
   ShortAnswerQuestion,
 } from '../types/kisiKisi';
+import { postApiJson } from '../utils/apiClient';
 import { buildMarkdownTable, exportExamPaperToWordDoc } from '../utils/exportBlueprint';
 import { FormUjianView } from './FormUjianView';
 
@@ -87,10 +88,9 @@ export const NaskahSoalView: React.FC<NaskahSoalViewProps> = ({
     setErrorMsg(null);
 
     try {
-      const response = await fetch('/api/naskah-soal/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<ExamPaperPackage>(
+        '/api/naskah-soal/generate',
+        {
           kisiKisiText: kisiPayload,
           mataPelajaran: blueprint.config.mataPelajaran,
           kelasLabel: GRADE_LABELS[blueprint.config.kelas],
@@ -102,15 +102,10 @@ export const NaskahSoalView: React.FC<NaskahSoalViewProps> = ({
           jumlahPG,
           jumlahIsian,
           jumlahUraian,
-        }),
-      });
+        }
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Gagal menyusun naskah soal ujian.');
-      }
-
-      onUpdateExamPaper(data as ExamPaperPackage);
+      onUpdateExamPaper(data);
     } catch (err: unknown) {
       setErrorMsg(
         err instanceof Error

@@ -19,6 +19,7 @@ import type {
   ScoreAnalysisNarrative,
   StudentScoreRecord,
 } from '../types/kisiKisi';
+import { postApiJson } from '../utils/apiClient';
 import {
   exportScoreAnalysisToCSV,
   exportScoreAnalysisToWordDoc,
@@ -242,25 +243,19 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
         .filter((r) => r.nilai < kktp)
         .map((r) => ({ nama: r.nama, nilai: r.nilai }));
 
-      const response = await fetch('/api/analisis-hasil/interpretasi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await postApiJson<ScoreAnalysisNarrative>(
+        '/api/analisis-hasil/interpretasi',
+        {
           mataPelajaran,
           kelasLabel,
           materiPokok: blueprint.config.materiPokok,
           kktp,
           stats,
           daftarBelumTuntas,
-        }),
-      });
+        }
+      );
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || 'Gagal menyusun interpretasi hasil evaluasi.');
-      }
-
-      setNarrative(data as ScoreAnalysisNarrative);
+      setNarrative(data);
     } catch (err: unknown) {
       setErrorMsg(
         err instanceof Error
