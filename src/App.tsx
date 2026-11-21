@@ -529,6 +529,7 @@ export default function App() {
             blueprint={blueprint}
             examPaper={examPaper}
             onUpdateExamPaper={setExamPaper}
+            onOpenAnalisis={() => setActiveTab('analisis')}
           />
         )}
 

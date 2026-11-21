@@ -27,6 +27,7 @@ interface NaskahSoalViewProps {
   blueprint: KisiBlueprint;
   examPaper: ExamPaperPackage | null;
   onUpdateExamPaper: (next: ExamPaperPackage) => void;
+  onOpenAnalisis?: () => void;
 }
 
 type SourceMode = 'active' | 'paste';
@@ -43,6 +44,7 @@ export const NaskahSoalView: React.FC<NaskahSoalViewProps> = ({
   blueprint,
   examPaper,
   onUpdateExamPaper,
+  onOpenAnalisis,
 }) => {
   const [sourceMode, setSourceMode] = useState<SourceMode>('active');
   const [pastedKisi, setPastedKisi] = useState<string>('');
@@ -260,6 +262,7 @@ export const NaskahSoalView: React.FC<NaskahSoalViewProps> = ({
           blueprint={blueprint}
           examPaper={examPaper}
           onSwitchToGenerator={() => setSubTab('composer')}
+          onOpenAnalisis={onOpenAnalisis}
         />
       ) : (
         <>

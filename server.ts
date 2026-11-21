@@ -428,6 +428,43 @@ app.get('/api/cbt/submissions', (req, res) => {
   res.json({ submissions: list });
 });
 
+app.post('/api/cbt/submissions', (req, res) => {
+  try {
+    const incoming = req.body?.submission as ExamFormSubmission | undefined;
+    if (!incoming || !incoming.id || !String(incoming.namaSiswa || '').trim()) {
+      res.status(400).json({ error: 'Data hasil ujian peserta tidak valid.' });
+      return;
+    }
+
+    const store = loadCbtStore();
+    const idx = store.submissions.findIndex((s) => s.id === incoming.id);
+    if (idx >= 0) {
+      store.submissions[idx] = incoming;
+    } else {
+      store.submissions.unshift(incoming);
+    }
+    saveCbtStore(store);
+
+    res.json({ submission: incoming });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Gagal menyinkronkan hasil ujian CBT.';
+    res.status(500).json({ error: message });
+  }
+});
+
+app.delete('/api/cbt/submissions', (req, res) => {
+  const id = String(req.query.id || '').trim();
+  const store = loadCbtStore();
+  if (id) {
+    store.submissions = store.submissions.filter((s) => s.id !== id);
+  } else {
+    store.submissions = [];
+  }
+  saveCbtStore(store);
+  res.json({ ok: true });
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, mode: 'local-engine' });
 });

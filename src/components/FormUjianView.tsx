@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  BarChart3,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -56,6 +57,7 @@ interface FormUjianViewProps {
   onSwitchToGenerator: () => void;
   studentLockMode?: boolean;
   sharedSession?: CbtSharedSession | null;
+  onOpenAnalisis?: () => void;
 }
 
 type OptionLetter = 'A' | 'B' | 'C' | 'D';
@@ -136,6 +138,7 @@ export const FormUjianView: React.FC<FormUjianViewProps> = ({
   onSwitchToGenerator,
   studentLockMode = false,
   sharedSession = null,
+  onOpenAnalisis,
 }) => {
   const [useSamplePaper, setUseSamplePaper] = useState<boolean>(!examPaper);
 
@@ -461,6 +464,11 @@ export const FormUjianView: React.FC<FormUjianViewProps> = ({
       setSubmittedRecord(record);
       setStudentShowScore(security.tampilkanNilaiKeSiswa);
       setSubmissions((prev) => [record, ...prev]);
+      fetch('/api/cbt/submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submission: record }),
+      }).catch(() => {});
       setTimerRunning(false);
       setCbtStarted(false);
       setShowViolationModal(false);
@@ -784,6 +792,28 @@ export const FormUjianView: React.FC<FormUjianViewProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (studentLockMode) return;
+    let cancelled = false;
+    fetch('/api/cbt/submissions')
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .then((data: { submissions?: ExamFormSubmission[] } | null) => {
+        if (cancelled || !data?.submissions?.length) return;
+        setSubmissions((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const uniqueIncoming = data.submissions!.filter(
+            (item) => !existingIds.has(item.id)
+          );
+          if (uniqueIncoming.length === 0) return prev;
+          return [...uniqueIncoming, ...prev];
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [studentLockMode]);
+
   const toggleFlag = (key: string) => {
     setFlaggedKeys((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -844,6 +874,11 @@ export const FormUjianView: React.FC<FormUjianViewProps> = ({
     setSubmissions((prev) =>
       prev.map((item) => (item.id === updated.id ? updated : item))
     );
+    fetch('/api/cbt/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submission: updated }),
+    }).catch(() => {});
   };
 
   const handleResetForNewStudent = () => {
@@ -1529,6 +1564,16 @@ export const FormUjianView: React.FC<FormUjianViewProps> = ({
                     <Printer className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>Cetak Bukti PDF</span>
                   </button>
+                  {onOpenAnalisis && (
+                    <button
+                      type="button"
+                      onClick={onOpenAnalisis}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 whitespace-nowrap"
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>Analisis Hasil Ujian</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleResetForNewStudent}
@@ -3023,6 +3068,16 @@ export const FormUjianView: React.FC<FormUjianViewProps> = ({
 
               {submissions.length > 0 && (
                 <>
+                  {onOpenAnalisis && (
+                    <button
+                      type="button"
+                      onClick={onOpenAnalisis}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-900 whitespace-nowrap"
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>Analisis Hasil &amp; Tindak Lanjut</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleCopyRecapForAnalysis}
@@ -3045,7 +3100,10 @@ export const FormUjianView: React.FC<FormUjianViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSubmissions([])}
+                    onClick={() => {
+                      setSubmissions([]);
+                      fetch('/api/cbt/submissions', { method: 'DELETE' }).catch(() => {});
+                    }}
                     className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 whitespace-nowrap"
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />

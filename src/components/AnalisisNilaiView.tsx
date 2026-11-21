@@ -7,6 +7,7 @@ import {
   FileText,
   Loader2,
   Printer,
+  RefreshCw,
   Search,
   Sparkles,
   Upload,
@@ -104,7 +105,7 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
       return null;
     });
 
-  const [formSubmissions] = useState<ExamFormSubmission[]>(() => {
+  const [formSubmissions, setFormSubmissions] = useState<ExamFormSubmission[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_FORM_SUBMISSIONS_KEY);
       if (raw) {
@@ -115,6 +116,127 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
     }
     return [];
   });
+  const [selectedCbtGroup, setSelectedCbtGroup] = useState<string>('ALL');
+  const [isSyncingCbt, setIsSyncingCbt] = useState<boolean>(false);
+  const [cbtSyncNote, setCbtSyncNote] = useState<string | null>(null);
+
+  const userEditedRawRef = useRef<boolean>(false);
+
+  const cbtGroups = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; count: number; mataPelajaran: string; kelas: string }>();
+    for (const sub of formSubmissions) {
+      const codePart = sub.cbtSessionCode || 'LOKAL';
+      const key = `${codePart}::${sub.mataPelajaran}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(key, {
+          key,
+          label: sub.cbtSessionCode
+            ? `${sub.mataPelajaran} (${sub.cbtSessionCode})`
+            : `${sub.mataPelajaran} (CBT Lokal)`,
+          count: 1,
+          mataPelajaran: sub.mataPelajaran,
+          kelas: sub.kelas,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [formSubmissions]);
+
+  const applyCbtSubmissionsToInput = (
+    list: ExamFormSubmission[],
+    groupKey: string,
+    announce = false
+  ) => {
+    const filtered =
+      groupKey === 'ALL'
+        ? list
+        : list.filter(
+            (s) => `${s.cbtSessionCode || 'LOKAL'}::${s.mataPelajaran}` === groupKey
+          );
+    if (filtered.length === 0) return false;
+
+    const lines = filtered.map(
+      (s, idx) => `${idx + 1}\t${s.namaSiswa}\t${s.nilaiAkhir}`
+    );
+    setRawInput(lines.join('\n'));
+    setNarrative(null);
+
+    const uniqueSubjects = Array.from(new Set(filtered.map((s) => s.mataPelajaran)));
+    if (uniqueSubjects.length === 1 && uniqueSubjects[0]) {
+      setMataPelajaran(uniqueSubjects[0]);
+    }
+    const uniqueKelas = Array.from(new Set(filtered.map((s) => s.kelas).filter(Boolean)));
+    if (uniqueKelas.length === 1 && uniqueKelas[0]) {
+      setKelasLabel(uniqueKelas[0]);
+    }
+
+    if (announce) {
+      setCbtSyncNote(`Memuat ${filtered.length} hasil ujian CBT ke Analisis Hasil Ujian.`);
+      window.setTimeout(() => setCbtSyncNote(null), 3500);
+    }
+    return true;
+  };
+
+  const syncCbtSubmissionsFromServer = async (forceApplyToInput = false) => {
+    setIsSyncingCbt(true);
+    let localList: ExamFormSubmission[] = [];
+    try {
+      const raw = localStorage.getItem(STORAGE_FORM_SUBMISSIONS_KEY);
+      if (raw) {
+        localList = JSON.parse(raw) as ExamFormSubmission[];
+      }
+    } catch {
+      localList = [];
+    }
+
+    let merged = [...localList];
+    try {
+      const resp = await fetch('/api/cbt/submissions');
+      if (resp.ok) {
+        const data = (await resp.json()) as { submissions?: ExamFormSubmission[] };
+        const serverList = data.submissions || [];
+        const byId = new Map<string, ExamFormSubmission>();
+        for (const item of [...serverList, ...localList]) {
+          if (item?.id && !byId.has(item.id)) {
+            byId.set(item.id, item);
+          }
+        }
+        merged = Array.from(byId.values()).sort(
+          (a, b) =>
+            new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+        );
+        try {
+          localStorage.setItem(STORAGE_FORM_SUBMISSIONS_KEY, JSON.stringify(merged));
+        } catch {
+          // ignore storage quota errors
+        }
+      }
+    } catch {
+      // keep localList fallback
+    }
+
+    setFormSubmissions(merged);
+
+    if (merged.length > 0 && (forceApplyToInput || !userEditedRawRef.current)) {
+      applyCbtSubmissionsToInput(merged, selectedCbtGroup, forceApplyToInput);
+    } else if (forceApplyToInput && merged.length === 0) {
+      setCbtSyncNote('Belum ada peserta yang mengumpulkan ujian CBT.');
+      window.setTimeout(() => setCbtSyncNote(null), 3500);
+    }
+    setIsSyncingCbt(false);
+  };
+
+  useEffect(() => {
+    // Auto-load local CBT results immediately on mount, then merge server CBT submissions
+    if (formSubmissions.length > 0 && !userEditedRawRef.current) {
+      applyCbtSubmissionsToInput(formSubmissions, 'ALL', false);
+    }
+    syncCbtSubmissionsFromServer(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     try {
@@ -392,19 +514,18 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      const lines = formSubmissions.map(
-                        (s, idx) => `${idx + 1}\t${s.namaSiswa}\t${s.nilaiAkhir}`
-                      );
-                      setRawInput(lines.join('\n'));
+                      userEditedRawRef.current = false;
+                      applyCbtSubmissionsToInput(formSubmissions, selectedCbtGroup, true);
                     }}
                     className="text-xs font-semibold text-emerald-800 hover:underline"
                   >
-                    Muat dari Form Ujian ({formSubmissions.length})
+                    Muat Hasil CBT ({formSubmissions.length})
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => {
+                    userEditedRawRef.current = true;
                     setRawInput(SAMPLE_STUDENT_SCORES);
                     setNarrative(null);
                   }}
@@ -415,6 +536,7 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    userEditedRawRef.current = true;
                     setRawInput('');
                     setNarrative(null);
                     setErrorMsg(null);
@@ -425,11 +547,71 @@ export const AnalisisNilaiView: React.FC<AnalisisNilaiViewProps> = ({
                 </button>
               </div>
             </div>
+
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50/50 px-3 py-2">
+              <div className="text-xs text-slate-700">
+                <span className="font-semibold text-blue-950">Hasil Ujian CBT:</span>{' '}
+                {formSubmissions.length > 0 ? (
+                  <span className="font-mono font-semibold text-emerald-900 tabular-nums">
+                    {formSubmissions.length} peserta siap dianalisis
+                  </span>
+                ) : (
+                  <span className="text-slate-600">
+                    Belum ada kiriman CBT (klik sinkronkan setelah siswa mengumpulkan)
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {cbtGroups.length > 1 && (
+                  <select
+                    aria-label="Filter sesi atau mata pelajaran CBT"
+                    value={selectedCbtGroup}
+                    onChange={(e) => {
+                      const nextKey = e.target.value;
+                      setSelectedCbtGroup(nextKey);
+                      userEditedRawRef.current = false;
+                      applyCbtSubmissionsToInput(formSubmissions, nextKey, true);
+                    }}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800"
+                  >
+                    <option value="ALL">Semua Sesi CBT ({formSubmissions.length})</option>
+                    {cbtGroups.map((g) => (
+                      <option key={g.key} value={g.key}>
+                        {g.label} ({g.count})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    userEditedRawRef.current = false;
+                    syncCbtSubmissionsFromServer(true);
+                  }}
+                  disabled={isSyncingCbt}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-blue-300 bg-white px-2.5 py-1 text-xs font-semibold text-blue-900 hover:bg-blue-100 whitespace-nowrap"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${isSyncingCbt ? 'animate-spin' : ''}`}
+                    aria-hidden="true"
+                  />
+                  <span>Sinkronkan &amp; Muat CBT</span>
+                </button>
+              </div>
+            </div>
+
+            {cbtSyncNote && (
+              <div className="mb-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900">
+                {cbtSyncNote}
+              </div>
+            )}
+
             <textarea
               id="raw-scores-textarea"
               rows={8}
               value={rawInput}
               onChange={(e) => {
+                userEditedRawRef.current = true;
                 setRawInput(e.target.value);
                 setNarrative(null);
               }}
