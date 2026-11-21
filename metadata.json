@@ -1,0 +1,6 @@
+{
+  "name": "Evaluasi SMP — Penyusun Kisi-Kisi Ujian Semester",
+  "description": "Instrumen ahli evaluasi pendidikan untuk menyusun kisi-kisi ujian semester SMP kelas VII–IX (semester 1 & 2) lengkap dengan Capaian Pembelajaran, Tujuan Pembelajaran, Indikator Soal, Level Kognitif C1–C6, Bentuk Soal, dan Nomor Soal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
